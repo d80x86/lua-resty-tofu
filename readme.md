@@ -25,35 +25,36 @@ openresty 在提供脚手架方面非常有限，请确保环境已安装好  op
 
 
 
-### 创建项目目录
+### 创建项目
 
-> 创建一个普通的目录，并进入该目录中
-
-```sh
-## 创建一个项目目录
-mkdir project_name
-cd project_name
-
-## 使用opm，仅安装tofu在当前项目,并软连接到当前目录
-mkdir -p lua_modules/resty
-opm --install-path=lua_modules/resty install d80x86/lua-resty-tofu
-ln -s lua_modules/resty/lualib/resty/tofu/cli/tofu tofu
-
-## 使用tofu脚手架初始化目录, 因为当前目录已存在，这里会提示:目录已存在是否覆盖
-## 选择 y 覆盖即可
-./tofu new
-
-```
-
-
-
-### 安装依赖
+> 使用项目工程模板 详细查看 [d80x86/tofu-project-default (github.com)](https://github.com/d80x86/tofu-project-default)
 
 ```sh
+## 从github中clone
+git clone --depth=1 https://github.com/d80x86/tofu-project-default.git new_name
+
+## 进入项目
+cd new_name
+
+## 安装tofu framework
 ./tofu install
+
 ```
 
-> 内置的 view session 等组件依赖了第三方库
+
+
+### 可选操作
+
+```sh
+## 移除无用的旧git信息
+rm -rf .git
+
+## 添加
+echo '/lua_modules' >> .gitignore
+
+## 重新添加git信息
+git init
+```
 
 
 
@@ -134,8 +135,8 @@ version		show version information
 -- 使用 -- string 或 {'方式:opm|luarocks', '<package name>'}
 deps = {
 		'bungle/lua-resty-template',	-- 默认使用 opm 方式
-			'bungle/lua-resty-session',
-				{'luarocks', 'lua-resty-jwt'} -- 指定 luarocks 方式
+		'bungle/lua-resty-session',
+		{'luarocks', 'lua-resty-jwt'} -- 指定 luarocks 方式
 }
 ```
 
@@ -149,41 +150,18 @@ tofu 会根据 ```tofu.package.lua``` 文件中所配置 ```deps={...}``` 列表
 
 相关依赖安装在当前目录```lua_modules```中.（默认情况下tofu已将该目录添加到 lua_package_path 中了）
 
-下面是安装依赖包的过程信息
+类信于下面的安装依赖包的过程信息
 
-```sh
+```text
 install bungle/lua-resty-template
 * Fetching bungle/lua-resty-template  
-  Downloading https://opm.openresty.org/api/pkg/tarball/bungle/lua-resty-template-2.0.opm.tar.gz
-	  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-		                                 Dload  Upload   Total   Spent    Left  Speed
-																		 100 40890  100 40890    0     0  62267      0 --:--:-- --:--:-- --:--:-- 62237
-																		 Package bungle/lua-resty-template 2.0 installed successfully under 
-
-																		 install bungle/lua-resty-session
-																		 * Fetching bungle/lua-resty-session  
-																		   Downloading https://opm.openresty.org/api/pkg/tarball/bungle/lua-resty-session-3.8.opm.tar.gz
-																			   % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-																				                                  Dload  Upload   Total   Spent    Left  Speed
-																																					100 48825  100 48825    0     0  87871      0 --:--:-- --:--:-- --:--:-- 87814
-																																					* Fetching openresty/lua-resty-string  
-																																					  Downloading https://opm.openresty.org/api/pkg/tarball/openresty/lua-resty-string-0.11.opm.tar.gz
-																																						  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-																																							                                 Dload  Upload   Total   Spent    Left  Speed
-																																																							 100  6144  100  6144    0     0  17539      0 --:--:-- --:--:-- --:--:-- 17554
-																																																							 Package openresty/lua-resty-string 0.11 installed successfully under /
-
-																																																							 Package bungle/lua-resty-session 3.8 installed successfully under 
-
-																																																							 install lua-resty-jwt
-																																																							 Warning: falling back to wget - install luasec to get native HTTPS support
-																																																							 Installing https://luarocks.org/lua-resty-jwt-0.2.3-0.src.rock
-																																																							 Missing dependencies for lua-resty-jwt 0.2.3-0:
-																																																							    lua-resty-openssl >= 0.6.8 (not installed)
-
-																																																									...
-																																																									```
-
-
+...
+install bungle/lua-resty-session
+* Fetching bungle/lua-resty-session  
+* Fetching openresty/lua-resty-string  
+...
+install lua-resty-jwt
+...
+```
 
 
