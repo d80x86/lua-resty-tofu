@@ -1,7 +1,7 @@
 --
 -- @file view.lua
 -- @author d
--- @version 0.1.1
+-- @version 0.1.2
 --
 
 
@@ -73,14 +73,17 @@ function _M.render(tpl, param)
 	if  _str_sub(tpl, -_ext_len) ~= _options.extname then
 		tpl = tpl .. _options.extname
 	end
-	_template.render(tpl, param)
+	return _template.process(tpl, param)
 end
 
 
 function _M.display(tpl, param)
 	local assign = _getassign()
 	param = _tab_merge({}, assign, param)
-	_M.render(tpl, param)
+	local content = _M.render(tpl, param)
+	if content then
+		ngx.print(content)
+	end
 	return false
 end
 

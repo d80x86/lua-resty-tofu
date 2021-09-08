@@ -7,6 +7,7 @@
 local _format			= string.format
 local _gsub				= string.gsub
 local _lower			= string.lower
+local _match			= string.match
 local _concat			= table.concat
 
 local ok, _mysql  = pcall(require, 'resty.mysql')
@@ -31,7 +32,7 @@ local _str = ngx.quote_sql_str
 -- 有特殊不转换处理
 -- {'xxxx'}
 local _tab = function (obj) return 'string' == type(obj[1]) and obj[1] or '' end
-local _use = function (obj) return ngx.null == type(obj) and 'NULL' or '' end
+local _use = function (obj) return ngx.null == obj and 'NULL' or '' end
 
 -- 不支持的类型
 -- function
@@ -100,6 +101,10 @@ local _ext_operator = function (k, v)
 	-- 开区间
 	elseif '()' == op then
 		return _format('%s < `%s` and `%s` < %s', _var(ra), k, k, _var(rb))
+
+	-- < <= >= 等
+	elseif 2 == #v then
+		return _format('%s %s %s', k, op, _var(ra))
 	end
 
 	return '', 'condition:' .. k .. ' nonsupport'
@@ -124,11 +129,9 @@ end
 --
 local _values = function (vals)
 	local vls = {}
-	for i, v in pairs(vals) do
-		local typ = type(v)
+	for _, v in pairs(vals) do
 		vls[#vls + 1] = _var(v)
 	end
-
 	return _concat(vls, ',')
 end
 
@@ -265,20 +268,20 @@ end
 local _split = function (...)
 	local keys	= {}
 	local vals	= {}
-	local mg		= {}
 
 	-- merge
 	for i=1, select('#', ... ) do
 		for k, v in pairs(select(i, ... )) do
-			mg[k] = v
+			if not _match(k, '^[%a_][%w_]+$') then
+				return nil, '[' .. k .. '] not a valid field name'
+			end
+			if 'table' == type(v) then
+				return nil, 'the [' .. k .. '] value cannot be a structure type'
+			end
+			keys[#keys + 1] = k
+			vals[#vals + 1] = v
 		end
 	end
-
-	for k, v in pairs(mg) do
-		keys[#keys + 1] = k
-		vals[#vals + 1] = v
-	end
-
 	return keys, vals
 end
 
@@ -522,15 +525,25 @@ function _M:set(cond, pair, add)
 	assert(not _isempty(cond), 'the update condition cannot be nul')
 	assert(not _isempty(pair), 'the update target cannot be nul')
 	
-	-- 不存在则添加 
+	-- 添加模式: 不存在则添加 
 	if add then
+		local fvs = _merge({}, cond, pair)
+		if 'table' == type(add) then
+			_merge(fvs, add)
+		end
+		local fs, vs = _split(fvs)
+		if not fs then
+			return fs, vs
+		end
 		local sql = 'insert into `%s` (%s) values (%s) on duplicate key update %s'
-		local fs, vs = _split(cond, pair)
 		sql = _format(sql, self.name, _fields(fs), _values(vs), _setter(pair)) 
 		local res, err = _M.exec(self, sql)
-		return res and res.insert_id, err
+		if not res then
+			return nil, err
+		end
+		return res.affected_rows, res.insert_id
 	
-	-- 只更新
+	-- 更新模式
 	else
 		local sql = 'update `%s` set %s %s'
 		sql = _format(sql, self.name, _setter(pair), _cond(cond)) 
@@ -544,10 +557,33 @@ end
 --
 -- @restun id, err	id -- nil:error, 0:update/new, n:new id
 --
-function _M:add(pair)
+function _M:add(...)
+	local pair = select(1, ...)
+	assert('table' == type(pair), 'bad argument #1 (table expected, got '.. type(pair) ..')')
 	local sql = 'insert into `%s` (%s) values (%s)'
 	local fs, vs = _split(pair)
-	sql = _format(sql, self.name, _fields(fs), _values(vs)) 
+	if not fs then
+		return fs, vs
+	end
+	local vs_list = {_values(vs)}
+	-- 多行
+	for i=2, select('#', ...) do
+		local obj = select(i, ...)
+		if 'table' ~= type(obj) then
+			return nil, 'bad argument #' .. (i + 1) .. '(table expected, got '.. type(obj) .. ')'
+		end
+		local ivs = {}
+		for _, k in ipairs(fs) do
+			if nil == obj[k] then
+				ivs[#ivs + 1] = ngx.null
+			else
+				ivs[#ivs + 1] = obj[k]
+			end
+		end
+		vs_list[#vs_list + 1] = _values(ivs)
+	end
+
+	sql = _format(sql, self.name, _fields(fs), _concat(vs_list, '),(')) 
 	local res, err = _M.exec(self, sql)
 	return res and res.insert_id, err
 end
@@ -556,7 +592,10 @@ end
 
 
 
-function _M:del(cond, opt)
+function _M:del(cond)
+	if not cond then
+			return nil, 'bad argument #1'
+	end
 	local sql = 'delete from `%s` %s'
 	sql = _format(sql, self.name, _cond(cond))
 	local res, err = _M.exec(self,sql)

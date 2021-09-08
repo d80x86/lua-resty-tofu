@@ -14,6 +14,7 @@ local _tab_merge = _util.tab_merge
 local _options = {
 	name			= 'tofu_session',
 	ttl				= 20 * 60,
+	renewal		= true,
 	-- storage		= 'shm',  -- | ''
 	storage		= 'cookie',  -- | ''
 	-- secret		= '5df7f1701b778d03d57456afea567922',
@@ -63,6 +64,9 @@ end
 function _M.get(key)
 	local ses = _get_ses()
 	local v = ses.data[key]
+	if ses.expires and false ~= _options.renewal then
+		ses:save()
+	end
 	ses:close()
 	return v
 end
