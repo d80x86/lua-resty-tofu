@@ -32,10 +32,11 @@ local _ffi = require("ffi")
 --
 
 function _M.isempty(obj)
-	return 
-		not obj
+	local t = type(obj)
+	return nil == obj
 		or '' == obj
-		or 'table'==type(obj) and next(obj) == nil
+		or 'table' == t and next(obj) == nil
+		or 'userdata' == t and ngx and ngx.null == obj
 end
 
 
@@ -102,7 +103,7 @@ function _M.dirname(str)
 	if not str then
 		str = debug.getinfo(2, 'S').source:sub(2, -1)
 	end
-	return string.match(str, '(.*/)') or ''
+	return _str_match(str, '(.*/)') or ''
 end
 
 -- * 比上面快10+倍
@@ -122,7 +123,7 @@ end
 -- 长字符串比 match 效率好点
 function _M.trim(str)
 	-- return _str_gsub(_str_gsub(str, '^%s+', ''), '%s+$', '')
-	return _str_gsub(str, '^%s+(.-)%s+$', '%1')
+	return (_str_gsub(str, '^%s+(.-)%s+$', '%1'))
 end
 
 
@@ -132,12 +133,12 @@ end
 --
 --
 function _M.bin_hex(s)
-	return _str_gsub(s, '(.)', function (x) return _str_format('%02x', _str_byte(x)) end)
+	return (_str_gsub(s, '(.)', function (x) return _str_format('%02x', _str_byte(x)) end))
 end
 
 
 function _M.hex_bin(s)
-	return _str_gsub(s, '(..)', function(x) return _str_char(tonumber(x,16)) end)
+	return (_str_gsub(s, '(..)', function(x) return _str_char(tonumber(x,16)) end))
 end
 
 
@@ -149,7 +150,7 @@ end
 --
 function _M.envsubst(str, env)
 	env = env or {}
-	return _str_gsub(str, '%${%s*([%w_]*)%s*}', function(key) return env[key] or '' end)
+	return (_str_gsub(str, '%${%s*([%w_]*)%s*}', function(key) return env[key] or '' end))
 end
 
 
@@ -186,19 +187,36 @@ function _M.getusec()
 end
 
 
+
+-- 
+-- 获取当前时区
 --
--- 日期字符串的datetime
--- @param d 'yyyy-mm-dd hh:mm:ss' or 'yyyy/m/d'
-function _M.tosecond(d)
-	local n = _str_gmatch(tostring(d) or '', '[^-/ :]+')
+local _os_time = os.time()
+local _timezone = os.difftime(_os_time, os.time( os.date('!*t', _os_time) ) ) / 3600
+
+function _M.gettimezone()
+	return _timezone
+end
+
+--
+-- 日期字符串转换时间戳(秒)
+-- @param str 'yyyy-mm-dd hh:mm:ss' | 'yyyy/m/d' | '00:00:00'
+-- @param tz 时区, default: 0 
+-- @return int
+function _M.tosecond(str, tz)
+	local y, m, d = _str_match(str, '(%d+)[/%-]+(%d+)[/%-]+(%d+)')
+	local h, i, s = _str_match(str, '(%d+):(%d+):(%d+)')
+	if not ((y and  m and d) or (h and i and s)) then
+		return nil 
+	end
 	return os.time({
-		year	= n(),
-		month	= n(),
-		day		= n(),
-		hour	= n() or 0,
-		min		= n() or 0,
-		sec		= n() or 0,
-	}) -- or 0 | 253402271999
+		year	= y or 1970,
+		month	= m or 1,
+		day		= d or 1,
+		hour	= (h or 0) + _timezone - ( tz or 0), -- 时区处理
+		min		= i or 0,
+		sec		= s or 0,
+	})
 end
 
 

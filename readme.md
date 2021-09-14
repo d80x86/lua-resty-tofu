@@ -1,3 +1,16 @@
+<center>
+    <h1> tofu </h1>
+<svg width="192" height="192" xmlns="http://www.w3.org/2000/svg">
+ <g>
+  <g id="svg_1">
+   <path id="svg_20" d="m27.49104,48.05657l0,96.14392l137.01793,0l0,-69.15164l-68.89457,0l0,-27.24934" opacity="0.5" fill-opacity="null" stroke-opacity="null" stroke-width="16" stroke="#000" fill="#fff"/>
+  </g>
+ </g>
+</svg>
+</center>
+
+
+
 # lua-resty-tofu
 
 
@@ -31,9 +44,11 @@ alpha 阶段, 目前仅支持 linux/unix 环境
 
 ## 开速开始
 
-openresty 在提供脚手架方面非常有限，请确保环境已安装好  openresty 与 opm [安装]([OpenResty - Installation](http://openresty.org/en/installation.html)) , luarocks(可选)
+openresty 在提供脚手架方面非常有限，请确保环境已安装好
 
-
+* [openresty](http://openresty.org/en/installation.html)
+* [opm](http://openresty.org/en/installation.html) 
+* [luarocks (可选)](https://luarocks.org/)
 
 
 
@@ -97,11 +112,9 @@ git init
 
 ### 启动项目(生产)
 
-```
+```sh
 ./tofu start
 ```
-
-
 
 > 默认使用 9527 端口
 >
@@ -111,11 +124,11 @@ git init
 
 ### 停止服务
 
-> 开发模式，直接使用control + c 终止
-
 ``` sh
 ./tofu stop
 ```
+
+> 开发模式，直接使用control + c 终止
 
 
 
@@ -164,7 +177,7 @@ version		show version information
 deps = {
 		'bungle/lua-resty-template',	-- 默认使用 opm 方式
 		'bungle/lua-resty-session',
-		{'luarocks', 'lua-resty-jwt'} -- 指定 luarocks 方式
+		{'luarocks', 'lua-resty-jwt'} 	-- 指定 luarocks 方式
 }
 ```
 
@@ -272,7 +285,7 @@ ngx_port = 9527	-- 这是一个在 tofu.nginx.conf 中使用的变量, 配置ngi
 
 
 
-配置文件一般都约定使用一个 与 文件名相同的全局变量名
+配置文件约定使用一个 与 文件名相同的全局变量名
 
 ``` lua
 -- 配置文件 extend.lua 样例
@@ -287,15 +300,11 @@ extend = {
 
 
 
-```tofu.nginx.conf``` 这是个特殊的配文件，是个标准的[nginx](http://nginx.org/)配置文件。 额外支持使用 ${var_name} 变量.
-
-如果需要更复杂的处理，可以在 config.lua 中 设置 ngx_conf_file_template = true 开启 lua-resty-template 语法持持 (需要 库 lua-resty-template ) 支持 
-
-
-
-#### 配置加载与合并规则
+#### 多环境配置加载与合并规则
 
 加载目标配置文件, 加载目标环境配置文件。后加载的会覆盖或合并前面的同名配置。
+
+文件命名格式: `[name].[env].lua` , 如 `config.development.lua`, `config.production.lua`
 
 ```lua
 -- 配置文件 config.lua
@@ -325,6 +334,12 @@ api = {
 > 更多使用方法查看扩展: `resty.tofu.extend.config`
 
 
+
+#### 特殊配置文件
+
+```tofu.nginx.conf``` 这是个特殊的配文件，是个标准的[nginx](http://nginx.org/)配置文件。 额外支持使用 ${var_name} 变量.
+
+如果需要更复杂的处理，可以在 `config.lua` 中 设置 `ngx_conf_file_template = true` 开启` lua-resty-template` 语法持持 (需要 库 lua-resty-template ) 支持 
 
 
 
@@ -2411,5 +2426,475 @@ extend = {
     },
 }
 ```
+
+
+
+
+
+
+
+## 其它功能
+
+
+
+### websocket
+
+在tofu框架中使用websocket 非常简单，只需把普通的 controller "升级" 为wscontroller即可
+
+#### 使用
+
+``` lua
+local _wsc = require 'resty.tofu.wscontroller'
+```
+
+
+
+#### Lua API
+
+**upgrade(handler [, opts])**
+
+* `handler` table, 事件接收处理器
+
+| 事件方法                | 说明         | 必须 | 返回值 |
+| ----------------------- | ------------ | :--: | ------ |
+| _open(wb)               | 有新的连接   |  否  | state  |
+| _close(wb , state)      | 连接断开     |  否  |        |
+| _data(wb, data , state) | 有消息进入   |  否  |        |
+| _ping(wb, data, state)  | 收到ping消息 |  否  |        |
+| _pong(wb, data, state)  | 收到pong消息 |  否  |        |
+| _timeout(wb, state)     | 超时         |  否  |        |
+
+> `wb` [lua-resty-websocket](https://github.com/openresty/lua-resty-websocket) 对象
+>
+> `state` 保存当前用户状态,连接关闭后会被丢弃
+>
+> `data` 文本消息或binary消息
+
+
+
+* `opts` table,  配置
+
+| 参数            | 说明               | 必须 | 缺省  |
+| --------------- | ------------------ | :--: | ----- |
+| timeout         | 设置超时(秒)       |  否  | 5000  |
+| max_payload_len | 最大消息长度(byte) |  否  | 65535 |
+
+
+
+样例， ws://xxxx/ws 或 ws://xxxx/default/ws/index 进行连接
+
+``` lua
+-- lua/controller/default/ws
+
+local _wsc = require 'resty.tofu.wscontroller'
+
+local _M = {}
+
+function _M.index()
+    -- webscoket 握手处理，并设置接收websocket事件的处理
+    _wsc.upgrade(_M)
+end
+
+--
+-- websocket 事件处理
+--
+-- 当有连接完成时
+function _M._open(wb)
+    tofu.log.d('用户连接')
+    local state = {}
+    rturn state
+end
+
+-- 当连接断开时
+function _M._close(web, state)
+    tofu.log.d('断开连接')
+end
+
+-- 当有消息时
+function _M._data(wb, data, state)
+    tofu.log.d('接收数据:', data)
+    wb:send_text(data)
+end
+
+
+return _M
+```
+
+
+
+
+
+
+
+### 参数验证器
+
+tofu框架提供了一个简单的参数验证器 `resty.tofu.validation`。在tofu框架中推荐在guard阶断中使用，可以有效地验证参数，拦截请求，使得业务处理更新干净。
+
+#### 使用
+
+``` lua
+local validation = require 'tofu.validation'
+```
+
+
+
+#### Lua API
+
+**options(opts)**
+
+设置
+
+* `opts`
+
+  | 参数   | 类型            | 说明                                                         | 缺省  |
+  | ------ | --------------- | ------------------------------------------------------------ | :---: |
+  | mode   | int             | 0:检测所有参数,1:当无效参数时立即返回(中断后面的参数检测流程) |   0   |
+  | trim   | bool            | 是否去两端空白                                               | false |
+  | amend  | bool            | 是否自动修正参数(需指定method), 如bool参可以是 true \| 1 'true' | false |
+  | errmsg | string \| table | 缺省错误信息 优先级 指定>sgring>[0]                          |       |
+
+  errmsg
+
+  | 参数     | 类型   | 说明                                              | 缺省         |
+  | -------- | ------ | ------------------------------------------------- | ------------ |
+  | [0]      | string | 特殊的, 缺省信息,当没有指定错误信息时，使用该信息 | 参数错误     |
+  | required | string | required参数的错误信息                            | 参数不参为空 |
+
+  
+
+**handle(rules)**
+
+参数验证
+
+* `rules`
+
+  参数校验列表
+
+  | 校验方法名   | 说明         | 区间{min, max} |      |
+  | ------------ | ------------ | :------------: | ---- |
+  | int          | 整型         |      支持      |      |
+  | float        | 数值(number) |      支持      |      |
+  | digit        | 纯数字串     |      支持      |      |
+  | string       | 字符串       |      支持      |      |
+  | date         | 日期         |                |      |
+  | bool         | 布尔         |                |      |
+  | alpha        | 字母         |                |      |
+  | hex          | 十六进制     |                |      |
+  | alphanumeric | 字母数字     |                |      |
+  
+  样例
+  
+  ``` lua
+  -- <应用>lua/guard/default/index.lua
+  
+  local _validator = require 'resty.tofu.validation'.handle
+  
+  local _M = {}
+  
+  function _M.index()
+      -- 验证用户帐号与用户密码
+      local rules = {
+          -- 参数名称 = { 验证规则 }
+          -- 参数为必填, 字符串,长度限定在 [2, 20] 区间
+          account = {required=true, string={min=2, max=20}, errmsg='帐号参数错误'},
+  
+          -- 参数为必填, 字符串,长度限定在 [6, 20] 区间
+          password = {required=true, string={min=6, 20}, errmsg={ string='密码长度错误' }}
+      }
+      
+      -- 如果参数有错误，则返回false 中断流程
+      local ok, errs = _validator(rules)
+      if not ok then
+          tofu.log.d(errs)
+          return tofu.fail(400, errs)
+      end
+  end
+  
+  return _M
+  ```
+  
+  
+
+**register(fs, f)**
+
+注册新的/自定义验证器
+
+* `fs`
+
+  string 过滤器名称, table {string = function} 添加多个型式
+
+  保留的方法/属性
+
+  | 名称     | 说明                 | 缺省     |
+  | -------- | -------------------- | -------- |
+  | required | 是否必填参           | false    |
+  | errmsg   | 错误信息             | 参数错误 |
+  | value    | 获取值               |          |
+  | default  | 缺省值               |          |
+  | trim     | 是否去两端空白       | false    |
+  | amend    | 是否自动修           | false    |
+  | method   | 参数使用那种方法获取 |          |
+
+  
+
+* `f`
+
+  function(value, cond) -> bool 验证器
+
+  `value` 将要校验的值
+
+  `cond` 校验条件
+
+  当 value 合乎 cond 时返回 true
+
+样例
+
+``` lua
+
+-- 增一个名为 mylist 的验证器
+-- 作用：值必须存在列表中
+local register = require 'tofu.validation'.register
+register('mylist', function(v, cond)       
+    if 'table' == type(cond) then
+    	for _, c in ipairs(cond) do
+        	if v == c then return true end
+        end
+   		return false
+    end
+        
+    return false
+end)
+```
+
+这个验证器有什么用，怎么用
+
+``` lua
+-- <应用>/lua/guard/default/test.lua
+
+-- 有参数要求
+-- y 年份, 必填，且只可以是 2019 2020 2021 的其中之一
+-- m 月份, 可选，且只可以是 02 05 07 12 这四个月份的其中之一, 缺省为 07
+
+
+local _validator = require 'resty.tofu.validation'.handle
+local _M = {}
+
+function _M.date()
+    local rules = {
+        -- 参数 y 
+        y = { required = true, mylist = {'2019', '2020', '2021'}, errmsg='年份参数错误'},
+        
+        -- 参数 m
+        m = { mylist = {'02', '05', '07', '08'}, default='07', errmsg = '月份参数错误'}
+    }
+    
+    local ok, err = _validator(rules)
+    if not ok then
+        return tofu.fail(400, err)
+    end
+end
+
+
+return _M
+```
+
+可以看到我们的验证器是可以通过简单的叠加，达到处理复杂的参数验证
+
+
+
+
+
+### 工具箱
+
+该包的api可以独立使用，也可以使用扩展组件方式集成到tofu中
+
+#### 使用
+
+``` lua
+local _util = require 'resty.tofu.util'
+```
+
+
+
+#### Lua API
+
+**split(str, delimiter)**
+
+使有分隔符切分字符串，返回table(数组)
+
+* `str` 要处理的字符串
+
+* `delimiter` 分隔符号
+
+  ``` lua
+  local str = '蛋散,粉肠,茂梨,碌葛'
+  local ret = _util.split(str, ',') 
+  
+  -- 结果: ret = {'蛋散‘,’粉肠‘,’茂梨‘,’碌葛'}
+  ```
+
+*　return table
+
+
+
+**msplit(str, sep)**
+
+使有分隔符切分字符串，返回table(数组)。与split不同，该方法支持多个分隔符
+
+* `str` 要处理的字符串
+
+* `sep` 分隔符号
+
+  ``` lua
+  local str = '蛋散,粉肠,茂梨,碌葛|神探肥标|厨师废柴'
+  local ret = _util.msplit(str, ',|') 
+  
+  -- 结果: ret = {'蛋散‘,’粉肠‘,’茂梨‘,’碌葛',神探肥标','厨师废柴'}
+  ```
+
+* return string
+
+  
+
+**dirname(str)**
+
+**getpath(str)**
+
+切分路径，这两个函数作用一样
+
+* `str`
+
+  ``` lua
+  local path = '/home/d/tofu/test.lua'
+  local ret = _util.getpath(str)
+  -- 结果: ret = '/home/d/tofu/'
+  ```
+
+* return string
+
+
+
+**trim(str)**
+
+去字符串两端空白
+
+* `str` 要处理的字符串
+
+  ``` lua
+  local str = '           神探肥标  厨师废柴  '
+  local ret = _util.trim(str)
+  
+  --结果: ret = '神探肥标  厨师废柴'
+  ```
+
+* return string
+
+
+
+**bin_hex(s)**
+
+把目标字符串，以二进制方式转换为十六进制字符串
+
+* `s` 要处理的字符串
+
+**hex_bin(s)**
+
+把十六进制字符串，以二进制方式转换为字符串
+
+* `s` 要处理的字符串
+
+  ``` lua
+  local str = 'hi tofu!'
+  _util.hex_bin(str) -- 686920746f667521
+  _util.bin_hex('686920746f667521') -- hi tofu!
+  ```
+
+* return string
+
+
+
+**envsubstr(str, env)**
+
+字符串模板中的变量`${}`替换
+
+* `str` 字符串模板
+
+* `env` 变量表
+
+  ``` lua
+  local str = 'hi ${name}!'
+  local ret = _util.envsubstr(str, { name='tofu' })
+  
+  -- 结果: ret = 'hi tofu!'
+  ```
+
+* return string
+
+
+
+**getusec()**
+
+获取系统微秒级时间戳
+
+* return int
+
+
+
+**gettimezone()**
+
+获取当前时区
+
+* return int
+
+
+
+**tosecond(str, tz)**
+
+日期时间转换时间戳(秒)
+
+* `str` 支持 yyyy-mm-dd hh:ii:ss | yyyy/m/d  | yyyy-m-d | hh:ii:ss 格式的日期时间字符串
+
+* `tz` 时区 default: 0，如北京时间东8区
+
+  ``` lua
+  _util.tosecond('1970-01-01 08:00:00')	-- 28800 秒
+  _util.tosecond('1970-01-01 08:00:00', 8)	-- 这是个北京时间字符串, 返回 0 秒
+  ```
+
+* return int
+
+
+
+**isempty(obj)**
+
+是否为空 '', {}, nil, ngx.null
+
+* return bool
+
+  
+
+**isint(v)**
+
+是否是int型
+
+* return bool
+
+  
+
+**isfloat(v)**
+
+是否是 float 型
+
+* return bool
+
+  
+
+**iscallable(f)**
+
+是否可调用
+
+* return bool
+
+
 
 

@@ -37,6 +37,7 @@ local _options = {
 -- 保留方法/属性
 --
 local _reserved = {
+	required= true,
 	errmsg	= true,
 	value		= true,
 	trim		= true,
@@ -130,7 +131,6 @@ end
 -- @param cond true | {[min:int], [max:int]}, {a,b,c ... }
 --
 function _validators.int(v, cond)
-	if nil == v  then return true end
 	v = tonumber(v)
 	if not _util_isint(v) then return false end
 	local t = type(cond)
@@ -161,7 +161,6 @@ end
 -- @param cond true | {[min:int], [max:int]}
 --
 function _validators.float(v, cond)
-	if nil == v then return true end
 	v = tonumber(v)
 	local t = type(cond)
 	if 'table' == t then
@@ -179,7 +178,6 @@ end
 -- @param cond true
 --
 function _validators.digit(v, cond)
-	if nil == v then return true end
 	return true == cond and not _str_match(v, '[^0-9]')
 end
 
@@ -190,7 +188,6 @@ end
 -- @param cond true | {[min:int], [max:int]} | {'a', 'b', ...}
 --
 function _validators.string(v, cond)
-	if nil == v then return true end
 	v = tostring(v)
 	local t = type (cond)
 	if 'table' == t then
@@ -221,12 +218,14 @@ end
 -- @param cond true | {[min:date], [max:date]}
 --
 function _validators.date(v, cond)
-	if nil == v then return true end
-	local sec = _util_tosecond(v) or 0
+	local sec = _util_tosecond(v)
+	if not sec then
+		return false
+	end
 	if 'table' == type (cond) then
-		return (not v.min or (_util_tosecond(v.min) or 253402271999) <= sec)
+		return (not cond.min or (_util_tosecond(cond.min) or 253402271999) <= sec)
 					 and
-					 (not v.max or sec <= (_util_tosecond(v.max) or -1))
+					 (not cond.max or sec <= (_util_tosecond(cond.max) or -1))
 	end
 	return true == cond and 0 < sec
 end
@@ -238,7 +237,6 @@ end
 -- @param cond true
 --
 function _validators.bool(v, cond)
-	if nil == v then return true end
 	v = '' ~= v 
 		and '0' ~= v and 0 ~= v 
 		and 'false' ~= ('string' == type(v) and _str_lower(v))
@@ -253,7 +251,6 @@ end
 -- @param cond true
 --
 function _validators.alpha(v, cond)
-	if nil == v then return true end
 	return true == cond and not _str_match(v, '[^a-zA-Z]')
 end
 
@@ -263,7 +260,6 @@ end
 -- @param cond true
 --
 function _validators.hex(v, cond)
-	if nil == v then return true end
 	return true == cond and not _str_match(v, '[^0-9a-fA-F]')
 end
 
@@ -274,9 +270,9 @@ end
 -- @param cond true
 --
 function _validators.alphanumeric(v, cond)
-	if nil == v then return true end
 	return true == cond and not _str_match(v, '[^0-9a-zA-Z]')
 end
+
 
 
 -- -----------------------------------------------------------------------
@@ -298,24 +294,35 @@ local function _handle(rules, opts)
 	local errs = {}
 	for p, r in pairs(rules) do
 		local v, m = _getvalue(p, r)
-		for k, cond in pairs(r) do
-			if not _reserved[k] then
-				local h = _validators[k]
-				if not h then
-					error ('validator '.. k .. ' not exist')
+		-- 如果为nil, 验证是否为必填参数
+		if nil == v then
+			if r.required then
+				errs[p] = _geterrmsg(p, 'required', r, opts)
+				if 1 == opts.mode then return false, errs end
+			end
+
+		-- 其它验证
+		else
+			for k, cond in pairs(r) do
+				if not _reserved[k] then
+					local h = _validators[k]
+					if not h then
+						error ('validator '.. k .. ' not exist')
+					end
+					local ok, valid, v2 =  pcall(h, v, cond)
+					if not ok then
+						-- error (valid)
+						tofu.log.e(valid)
+					end
+					if true ~= valid then
+						errs[p] = _geterrmsg(p, k, r, opts)
+						if 1 == opts.mode then return false, errs end
+					end
+					if nil ~= v2 then v = v2 end
 				end
-				local ok, valid, v2 =  pcall(h, v, cond)
-				if not ok then
-					-- error (valid)
-					tofu.log.e(valid)
-				end
-				if true ~= valid then 
-					errs[p] = _geterrmsg(p, k, r, opts)
-					if 1 == opts.mode then return false, errs end
-				end
-				if nil ~= v2 then v = v2 end
 			end
 		end
+
 		-- 修正参数
 		if _getnonil(r.amend, opts.amend) then
 			_setvalue(p, v, m)
