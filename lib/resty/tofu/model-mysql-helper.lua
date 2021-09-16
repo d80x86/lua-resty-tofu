@@ -499,17 +499,21 @@ end
 -- }
 --
 function _M:get(cond, opts)
-	opts = _merge({ limit = 1}, opts)
+	opts = opts or {}
 	local sql = 'select %s from `%s` %s %s %s %s'
 	sql = _format(sql, _fields(opts.field), self.name,
 		_cond(cond),
 		_orderby(opts.orderby),
-		_limit(opts.limit),
+		_limit(opts.limit or 1),
 		_forupdate(opts.forupdate)
 	)
 	local res, err = _M.exec(self, sql)	
 	if res then
-		return nil == opts.limit and res[1] or res, nil
+		if nil == opts.limit or false == opts.limit then
+			return res[1], nil
+		else
+			return res, nil
+		end
 	else
 		return nil, err
 	end
@@ -646,7 +650,7 @@ end
 
 
 --
---
+-- @return ok, result
 --
 function _M:trans(fn, ...)
 	self._istrans = true

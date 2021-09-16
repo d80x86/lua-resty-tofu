@@ -67,7 +67,11 @@ function _M.get(key, init, ...)
 		local lock = _get_and_lock(key)
 		val = _store:get(key)
 		if not val then
-			val = ('function' == init and init(...)) or init
+			if 'function' == type(init) then
+				val = init(...)
+			else
+				val = init
+			end
 			local ok, err = _store:safe_set(key, val)
 			if not ok then
 				error (err) -- 'no memory'

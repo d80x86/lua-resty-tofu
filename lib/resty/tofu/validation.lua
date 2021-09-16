@@ -328,7 +328,12 @@ local function _handle(rules, opts)
 			_setvalue(p, v, m)
 		end
 	end
-	return not next(errs), errs
+	
+	if not next(errs) then
+		return true, nil
+	else
+		return false, errs
+	end
 end
 
 
