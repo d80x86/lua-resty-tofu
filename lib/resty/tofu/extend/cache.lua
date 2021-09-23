@@ -7,6 +7,8 @@
 
 local _resty_lock		= require 'resty.lock'
 local _util					= require 'resty.tofu.util'
+local _encode				= require 'cjson'.encode
+local _decode				= require 'cjson'.decode
 
 local _M = { _VERSION = '0.1.0' }
 
@@ -63,22 +65,24 @@ function _M.get(key, init, ...)
 	end
 	key = _KEY_ .. key
 	local val = _store:get(key)
-	if not val and nil ~= init then
-		local lock = _get_and_lock(key)
-		val = _store:get(key)
-		if not val then
-			if 'function' == type(init) then
-				val = init(...)
-			else
-				val = init
-			end
-			local ok, err = _store:safe_set(key, val)
-			if not ok then
-				error (err) -- 'no memory'
-			end
-		end
-		lock:unlock()
+	if nil ~= val then
+		return _decode(val)
 	end
+
+	local lock = _get_and_lock(key)
+	val = _store:get(key)
+	if not val then
+		if 'function' == type(init) then
+			val = init(...)
+		else
+			val = init
+		end
+		local ok, err = _store:set(key, _encode(val), _opts.ttl)
+		if not ok then
+			error (err) -- 'no memory'
+		end
+	end
+	lock:unlock()
 	return val
 end
 
@@ -91,8 +95,7 @@ function _M.set(key, val, ttl)
 		error 'key error'
 	end
 	key = _KEY_ .. key
-	ttl = ttl or _opts.ttl
-	local ok, err = _store:set(key, val, ttl)
+	local ok, err = _store:set(key, _encode(val), ttl or _opts.ttl)
 	if not ok then
 		error (err)
 	end
@@ -117,8 +120,7 @@ function _M.incr(key, val, init, ttl)
 		error 'key error'
 	end
 	key = _KEY_ .. key
-	ttl = ttl or _opts.ttl
-	local newval, err = _store:incr(key, val, init, ttl)
+	local newval, err = _store:incr(key, val, init, ttl or _opts.ttl)
 	if err then
 		error (err)
 	end
