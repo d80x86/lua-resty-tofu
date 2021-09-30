@@ -307,9 +307,17 @@ local _limit = function (v)
 	elseif 'table' == typ and 'number' == type(v[1]) then 
 		local lt = 0 < v[1] and v[1] or 1
 		if 'number' == type(v[2]) then
-			lt = (lt - 1) * v[2] .. ','..v[2]
+			if 0 < v[2] then
+				lt = (lt - 1) * v[2] .. ','..v[2]
+			else
+				lt = lt .. ',' .. v[2]
+			end
 		end
 		return 'limit ' .. lt
+	elseif 'string' == typ then
+		return 'limit ' .. v
+	elseif 'nil' == typ then
+		return 'limit 1'
 	end
 	return ''
 end
@@ -504,12 +512,12 @@ function _M:get(cond, opts)
 	sql = _format(sql, _fields(opts.field), self.name,
 		_cond(cond),
 		_orderby(opts.orderby),
-		_limit(opts.limit or 1),
+		_limit(opts.limit),
 		_forupdate(opts.forupdate)
 	)
 	local res, err = _M.exec(self, sql)	
 	if res then
-		if nil == opts.limit or false == opts.limit then
+		if nil == opts.limit then
 			return res[1], nil
 		else
 			return res, nil

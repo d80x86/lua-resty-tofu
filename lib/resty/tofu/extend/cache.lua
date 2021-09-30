@@ -71,15 +71,18 @@ function _M.get(key, init, ...)
 
 	local lock = _get_and_lock(key)
 	val = _store:get(key)
-	if not val then
+	if nil == val then
 		if 'function' == type(init) then
 			val = init(...)
 		else
 			val = init
 		end
-		local ok, err = _store:set(key, _encode(val), _opts.ttl)
-		if not ok then
-			error (err) -- 'no memory'
+		if nil ~= val then
+			local ok, err = _store:set(key, _encode(val), _opts.ttl)
+			if not ok then
+				-- error (err) -- 'no memory'
+				return nil, err
+			end
 		end
 	end
 	lock:unlock()
