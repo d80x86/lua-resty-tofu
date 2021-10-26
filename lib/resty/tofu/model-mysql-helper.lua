@@ -25,7 +25,7 @@ local _clock			= _util.getusec
 -- 数据过虑器
 --
 local _nil = function() return 'NULL' end
-local _boo = function(b) return b end
+local _boo = function(b) return tostring(b) end
 local _num = function (num) return  tostring(tonumber(num or 0)) end
 local _str = ngx.quote_sql_str
 
@@ -101,6 +101,14 @@ local _ext_operator = function (k, v)
 	-- 开区间
 	elseif '()' == op then
 		return _format('%s < `%s` and `%s` < %s', _var(ra), k, k, _var(rb))
+
+	-- 逻辑或
+	elseif 'or' == op then
+		local list = {}
+		for i = 2, #v do
+			list[#list + 1] = _format('`%s`=%s', k ,_var(v[i]))
+		end
+		return _concat(list, ' or ')
 
 	-- < <= >= 等
 	elseif 2 == #v then

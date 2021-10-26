@@ -17,7 +17,7 @@ local _options = {
 	renewal		= true,
 	-- storage		= 'shm',  -- | ''
 	storage		= 'cookie',  -- | ''
-	-- secret		= '5df7f1701b778d03d57456afea567922',
+	secret		= '5df7f1701b778d03d57456afea567922',
 }
 
 
