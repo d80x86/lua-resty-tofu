@@ -12,10 +12,10 @@ local _config		= require 'resty.tofu.extend.config'
 local _util			= require 'resty.tofu.util'
 
 
-local _M = { _VERSION = '0.1.0' }
+local _M = { _VERSION = '0.1.1' }
 
 
-local _opts = {
+local _default = {
 	worker	= 'privileged agent',		-- 使用特权进程或指定worker进程执行
 	task		= 'task', -- string | { task = {}}
 }
@@ -34,22 +34,23 @@ local _opts = {
 local _log = tofu and tofu.log.e or error
 
 
-function _M.new(opts)
-	_util.tab_merge(_opts, opts)
+function _M._install(opts)
+	opts = _util.tab_merge(opts, _default)
 
-	if _process.type() ~= _opts.worker then
-		if ngx.worker.id() ~= _opts.worker then
+	if _process.type() ~= opts.worker then
+		if ngx.worker.id() ~= opts.worker then
 			return
 		end
 	end
 
-	if 'string' == type(_opts.task) then
-		local config = _config.new({ env = tofu.env, prefix = tofu.ROOT_PATH .. 'conf/'})
-		_opts.task = config.task
+	if 'string' == type(opts.task) then
+		local config = tofu.config or
+									_config._install({ env = tofu.env, prefix = tofu.ROOT_PATH .. 'conf/'})
+		opts.task = config.task
 	end
 
 	local cur_env = getfenv()
-	for _, t in ipairs(_opts.task) do
+	for _, t in ipairs(opts.task) do
 		if false ~= t.enable then
 			local h = t.handle
 			

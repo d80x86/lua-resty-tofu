@@ -30,6 +30,7 @@ function _M.remove(f)
 	if _cache[f] then
 		_cache[f] = nil
 	end
+	return true
 end
 
 

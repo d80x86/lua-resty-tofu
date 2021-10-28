@@ -2,7 +2,7 @@
 -- tofu 扩展
 -- @file jili.lua
 -- @author d
--- @brief 一个watcher(开发使用)
+-- @brief 一个watcher(开发使用), 当文件发生改变时，重启或加载文件
 --
 
 local _process	= require 'ngx.process'
@@ -30,12 +30,12 @@ local _opts = {
 
 	-- {监视的路径,与处理方式}
 	path = {
-		-- string | {string, string}
-		{tofu.ROOT_PATH .. 'conf', 'ngx_restart'},
-		{tofu.APP_PATH .. 'controller', 'reload'},
-		{tofu.APP_PATH .. 'middleware', 'ngx_restart'},
-		{tofu.APP_PATH .. 'task', 'ngx_restart'},
-		{tofu.APP_PATH .. 'model', 'reload'},
+		-- string | {path:string, ngx_restart | reload | auto_reload}
+		{tofu.ROOT_PATH	.. 'conf',				'ngx_restart'},
+		{tofu.APP_PATH	.. 'controller',	'auto_reload', '/_%w+%.lua$'},
+		{tofu.APP_PATH 	.. 'middleware',	'ngx_restart'},
+		{tofu.APP_PATH 	.. 'task',				'ngx_restart'},
+		{tofu.APP_PATH 	.. 'model',				'auto_reload', '/_%w+%.lua$'},
 
 		tofu.APP_PATH, -- default processor: ngx_restart
 	},
@@ -54,6 +54,10 @@ local _plan_handle = { }
 
 --
 -- @param m MOD | REM  : 修改 | 移除
+--
+
+--
+--
 --
 function _plan_handle.reload(f, m)
 	if 'MOD' == m then
@@ -79,7 +83,7 @@ end
 --
 --
 --
-function _plan_handle.ngx_restart(f, m)
+function _plan_handle.ngx_restart()
 	if 0 ~= ngx.worker.id() then
 		return true
 	end
@@ -87,6 +91,27 @@ function _plan_handle.ngx_restart(f, m)
 	local pid = _process.get_master_pid()
 	_cli_opts._init({})
 	os.execute('kill -HUP ' .. pid)
+	return true
+end
+
+
+--
+-- @param reg 正则匹配
+--
+function _plan_handle.auto_reload(f, m, reg)
+	if 0 ~= ngx.worker.id() then
+		return true
+	end
+
+	local ok, err = _plan_handle.reload(f, m)
+	if not ok then
+		return nil, err
+	end
+
+	if reg and _match(f, reg) then
+		return _plan_handle.ngx_restart()
+	end
+
 	return true
 end
 
@@ -105,10 +130,11 @@ _plan_handle.default = _plan_handle.ngx_reload
 local function _handle(iev)
 	if iev.isdir then return end
 	local ph = _plan_handle.default
-
+	local arg = nil
 	for _, p in ipairs(_plan) do
 		if _find(iev.path, p[1], 1, true) then
 			ph = _plan_handle[p[2]]
+			arg = p[3]
 			if not ph then
 				tofu.log.e('not found plan handleer:', p, iev)
 				return 
@@ -124,7 +150,7 @@ local function _handle(iev)
 	-- 修改(新建 create 与 modify 会同时发生) | 改名(新文件名)
 	-- 这些合并为修改 MOD 事件
 	if 0 < _band(_IN.MODIFY, iev.mask) or 0 < _band(_IN.MOVED_TO, iev.mask) then
-		local _, err = ph(f, 'MOD')
+		local _, err = ph(f, 'MOD', arg)
 		if _opts.trace and _is_show then
 			if err then
 				tofu.log.e(err)
@@ -147,7 +173,7 @@ end
 local _M = { _VERSION = '0.1.0' }
 
 
-function _M.new(opts)
+function _M._install(opts)
 	-- 只在 worker 上监视
 	if 'worker' ~= _process.type() then
 		return
@@ -156,7 +182,7 @@ function _M.new(opts)
 	_util.tab_merge(_opts, opts)
 	for _, p in ipairs(_opts.path) do
 		if 'table' == type(p) and p[1] then
-			_plan[#_plan + 1] = {p[1], p[2]}
+			_plan[#_plan + 1] = {p[1], p[2], p[3]}
 			if _util.file_exists(p[1]) then
 				_watcher:add_watch(p[1])
 			end

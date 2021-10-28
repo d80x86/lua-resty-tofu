@@ -47,7 +47,7 @@ end
 --
 -- 适配 tofu expend 接口
 --
-function _M.new(opts)
+function _M._install(opts)
 	_tab_merge(_options, opts)
 	_options.cookie = {lifetime = _options.ttl}
 	return _M

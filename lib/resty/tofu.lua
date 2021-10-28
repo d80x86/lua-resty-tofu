@@ -57,10 +57,11 @@ end
 --
 -- 读取 conf 下的配置
 --
-local _conf = require 'resty.tofu.extend.config'.new({
+local _conf = require 'resty.tofu.extend.config'._install({
 								env			= _tofu.env,
 								prefix	= _tofu.ROOT_PATH .. 'conf/',
 							})
+
 
 -- ---------------------------------------------------
 -- load extend 
@@ -101,7 +102,7 @@ do -- load extend begin --
 			_tofu[named] = setfenv(handle, new_env)(...)
 		elseif 'table' == type(handle) then
 			if named then
-				_tofu[named] = handle.new and handle.new(...) or handle
+				_tofu[named] = handle._install and handle._install(...) or handle
 			else
 				for k, v in pairs(handle) do
 					if '_' ~= _string_sub(k,1,1) then								-- 忽略下划线开头的字段
@@ -300,6 +301,7 @@ function _M.start()
 		else
 			ngx.log(ngx.ERR, err)
 		end
+		ngx.status = 500
 	end
 	_ctx.apply()
 	ngx.exit(ngx.status)

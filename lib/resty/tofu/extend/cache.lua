@@ -40,7 +40,7 @@ end
 --
 --
 --
-function _M.new(opts)
+function _M._install(opts)
 	_util.tab_merge(_opts, opts)
 	_store = ngx.shared[_opts.shm]
 	if not _store then

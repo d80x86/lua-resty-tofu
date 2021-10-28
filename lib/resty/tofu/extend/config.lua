@@ -55,7 +55,7 @@ end
 --
 --
 --
-function _M.new(opts)
+function _M._install(opts)
 	local _opts = {
 		_env			= opts.env		or _env,
 		_prefix		= opts.prefix	or _prefix,
@@ -85,6 +85,15 @@ function _M.new(opts)
 	return setmetatable({}, {__index = mt})
 	
 end
+
+
+--
+--
+--
+function _M.new(opts)
+	return _M._install(opts)
+end
+
 
 
 return _M 
