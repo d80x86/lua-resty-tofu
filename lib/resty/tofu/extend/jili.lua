@@ -30,12 +30,12 @@ local _opts = {
 
 	-- {监视的路径,与处理方式}
 	path = {
-		-- string | {path:string, ngx_restart | reload | auto_reload}
+		-- string | {path:string, ngx_restart | reload | auto_restart}
 		{tofu.ROOT_PATH	.. 'conf',				'ngx_restart'},
-		{tofu.APP_PATH	.. 'controller',	'auto_reload', '/_%w+%.lua$'},
+		{tofu.APP_PATH	.. 'controller',	'auto_restart', '/_%w+%.lua$'},
 		{tofu.APP_PATH 	.. 'middleware',	'ngx_restart'},
 		{tofu.APP_PATH 	.. 'task',				'ngx_restart'},
-		{tofu.APP_PATH 	.. 'model',				'auto_reload', '/_%w+%.lua$'},
+		{tofu.APP_PATH 	.. 'model',				'auto_restart', '/_%w+%.lua$'},
 
 		tofu.APP_PATH, -- default processor: ngx_restart
 	},
@@ -98,11 +98,7 @@ end
 --
 -- @param reg 正则匹配
 --
-function _plan_handle.auto_reload(f, m, reg)
-	if 0 ~= ngx.worker.id() then
-		return true
-	end
-
+function _plan_handle.auto_restart(f, m, reg)
 	local ok, err = _plan_handle.reload(f, m)
 	if not ok then
 		return nil, err
