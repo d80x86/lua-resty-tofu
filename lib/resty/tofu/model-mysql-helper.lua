@@ -409,6 +409,15 @@ end
 --
 --
 --
+function _M:ignore(ignore)
+	self.ignore = not not ignore
+	return self
+end
+
+
+--
+--
+--
 function _M:getconn(options)
 	if options then
 		_merge(self, options)
@@ -555,8 +564,9 @@ function _M:set(cond, pair, add)
 		if not fs then
 			return fs, vs
 		end
-		local sql = 'insert into `%s` (%s) values (%s) on duplicate key update %s'
-		sql = _format(sql, self.name, _fields(fs), _values(vs), _setter(pair)) 
+		local sql = 'insert%sinto `%s` (%s) values (%s) on duplicate key update %s'
+		sql = _format(sql, self.ignore and ' ignore ' or ' ',
+									self.name, _fields(fs), _values(vs), _setter(pair)) 
 		local res, err = _M.exec(self, sql)
 		if not res then
 			return nil, err
@@ -580,7 +590,7 @@ end
 function _M:add(...)
 	local pair = select(1, ...)
 	assert('table' == type(pair), 'bad argument #1 (table expected, got '.. type(pair) ..')')
-	local sql = 'insert into `%s` (%s) values (%s)'
+	local sql = 'insert%sinto `%s` (%s) values (%s)'
 	local fs, vs = _split(pair)
 	if not fs then
 		return fs, vs
@@ -603,7 +613,8 @@ function _M:add(...)
 		vs_list[#vs_list + 1] = _values(ivs)
 	end
 
-	sql = _format(sql, self.name, _fields(fs), _concat(vs_list, '),(')) 
+	sql = _format(sql, self.ignore and ' ignore ' or ' ',
+										self.name, _fields(fs), _concat(vs_list, '),(')) 
 	local res, err = _M.exec(self, sql)
 	return res and res.insert_id, err
 end
