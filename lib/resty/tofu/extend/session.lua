@@ -27,7 +27,7 @@ local _M = {}
 
 --
 -- 因为resty.session 无法在 init_worker_by_lua_* 阶段加载, 这里做一个hack
--- shm 模式有bug,这借ngx.ctx 保存ses的引用
+-- 使用ngx.ctx 保存ses的引用
 --
 local _ses = nil
 local _get_ses = function (lock)
@@ -37,9 +37,11 @@ local _get_ses = function (lock)
 
 	if not ngx.ctx.__tofu_session then
 		local opts = _tab_merge({}, _options)
-		ngx.ctx.__tofu_session = _ses.open(opts)
-		-- 未知原因 使用 start() 会有问题 (锁死...)
-		-- ngx.ctx.__tofu_session = lock and _ses.start(opts) or _ses.open(opts)
+		local ses = _ses.open(opts)
+		if lock and not ses.started then
+			ses:start()
+		end
+		ngx.ctx.__tofu_session = ses
 	end
 	return ngx.ctx.__tofu_session
 end
