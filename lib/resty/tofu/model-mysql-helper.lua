@@ -283,7 +283,7 @@ local _split = function (...)
 			if not _match(k, '^[%a_][%w_]+$') then
 				return nil, '[' .. k .. '] not a valid field name'
 			end
-			if 'table' == type(v) then
+			if 'table' == type(k) then
 				return nil, 'the [' .. k .. '] value cannot be a structure type'
 			end
 			keys[#keys + 1] = k
