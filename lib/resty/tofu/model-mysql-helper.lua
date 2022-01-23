@@ -1,6 +1,6 @@
 --
 -- @author d
--- @version 0.1.0
+-- @version 0.1.1
 -- @brief mysql访问助手
 --
 
@@ -19,6 +19,9 @@ local _isempty		= _util.isempty
 local _functional	= _util.functional
 local _tabnew			= _util.tab_new
 local _clock			= _util.getusec
+
+-- json数组标记
+local _json_array_mt   = require 'cjson' .empty_array_mt
 
 
 --
@@ -537,7 +540,7 @@ function _M:get(cond, opts)
 		if nil == opts.limit then
 			return res[1], nil
 		else
-			return res, nil
+			return setmetatable(res, _json_array_mt), nil
 		end
 	else
 		return nil, err
