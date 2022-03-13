@@ -16,7 +16,7 @@ local _M = { _VERSION = '0.1.1'}
 
 
 --
---
+-- 缺省配置
 --
 local _prefix = 'conf'
 local _env = nil
@@ -37,7 +37,7 @@ local function _load(conf_file, opts)
 
 	local conf = res
 
-	if _env then
+	if opts._env then
 		res, err = _conf_load(conf_file .. '.' .. opts._env .. '.lua')
 		if res then
 			_tab_merge(conf, res)
