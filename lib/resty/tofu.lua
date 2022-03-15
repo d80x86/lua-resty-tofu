@@ -28,7 +28,7 @@ _tofu.VERSION		= _mate._VERSION
 _tofu.TOFU_PATH	= _TOFU_PATH
 _tofu.ROOT_PATH	= ngx.config.prefix()
 _tofu.APP_PATH	= _tofu.ROOT_PATH .. _options.app_path
-_tofu.env				= os.getenv('NGX_ENV') or _options.env
+_tofu.ENV				= os.getenv('NGX_ENV') or _options.env
 
 -- ----------------------------------------------------
 -- hack
@@ -58,7 +58,7 @@ end
 -- 读取 conf 下的配置
 --
 local _conf = require 'resty.tofu.extend.config'._install({
-								env			= _tofu.env,
+								env			= _tofu.ENV,
 								prefix	= _tofu.ROOT_PATH .. 'conf/',
 							})
 
@@ -269,7 +269,7 @@ end -- load middleware end --
 --
 if 0 == ngx.worker.id() and _tofu.log then
 	_tofu.log.n('tofu version:', _M._VERSION)
-	_tofu.log.n('environment:', _tofu.env)
+	_tofu.log.n('environment:', _tofu.ENV)
 	if _conf.ngx_port then
 		_tofu.log.n('listen:', _conf.ngx_port)
 	end
