@@ -18,9 +18,11 @@ local _M = { _VERSION = '0.1.1'}
 --
 -- 缺省配置
 --
-local _prefix = 'conf'
-local _env = nil
-local _default = 'config'
+local _opts = {
+	prefix	= 'conf',
+	env			= nil,
+	default	= 'config',
+}
 
 
 
@@ -29,7 +31,10 @@ local _default = 'config'
 --
 --
 local function _load(conf_file, opts)
-	conf_file = opts._prefix .. '/' .. conf_file
+	opts = opts or {}
+	if opts.prefix then
+		conf_file = opts.prefix .. '/' .. conf_file
+	end
   local res, err = _conf_load(conf_file .. '.lua')
 	if err and 'cannot open' ~= err:sub(1, 11) then
 		return nil, err
@@ -37,8 +42,8 @@ local function _load(conf_file, opts)
 
 	local conf = res
 
-	if opts._env then
-		res, err = _conf_load(conf_file .. '.' .. opts._env .. '.lua')
+	if opts.env then
+		res, err = _conf_load(conf_file .. '.' .. opts.env .. '.lua')
 		if res then
 			_tab_merge(conf, res)
 		elseif err and 'cannot open' ~= err:sub(1, 11) then
@@ -56,23 +61,20 @@ end
 --
 --
 function _M._install(opts)
-	local _opts = {
-		_env			= opts.env		or _env,
-		_prefix		= opts.prefix	or _prefix,
-	}
+	opts = _tab_merge({}, _opts, opts)
 
 	-- cache
 	local	_conf		= {}
 	local _ready	= {}
 
-	local mt = function(t, key)
+	local __index = function(t, key)
 								local v = rawget(_conf, key)
-								if not v or not rawget(_ready, key) then
-									rawset(_ready, key, true)
-									local conf, err = _load(key, _opts)
+								if not v and not rawget(_ready, key) then
+									local conf, err = _load(key, opts)
 									if conf then
 										_tab_merge(_conf, conf)
 										v = rawget(_conf, key)
+										rawset(_ready, key, true)
 									elseif err then
 										(tofu and tofu.log and tofu.log.e or error)(err)
 									end
@@ -80,10 +82,25 @@ function _M._install(opts)
 								return v
 							end
 
+	local __newindex = function(t, key, v)
+		rawset(_conf, key, v)
+		rawset(_ready, key, true)
+	end
 
-	mt(_opts, opts.default or _default)
-	return setmetatable({}, {__index = mt})
-	
+	-- preload config
+	__index(opts, opts.default)
+
+	return setmetatable({}, {__index = __index, __newindex = __newindex})
+end
+
+
+
+--
+--
+--
+function _M.read(conf_file, opts)
+	opts = opts or {}
+	return _load(conf_file, opts)
 end
 
 

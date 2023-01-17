@@ -28,7 +28,8 @@ local _options = {
 }
 
 local _conf = _util.conf_load(_tofu.ROOT_PATH .. 'conf/config.lua')
-_merge(_options, _conf)
+local _conf_env = _util.conf_load(_tofu.ROOT_PATH .. 'conf/config.'.. tofu.ENV ..'.lua')
+_merge(_options, _conf, _conf_env)
 
 
 

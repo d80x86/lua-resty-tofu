@@ -15,6 +15,7 @@ local _TOFU_PATH	= debug.getinfo(1, 'S').source:sub(2,-1):match('^.*/')
 local _options = {
 	env				= 'production',  -- | development
 	app_path	= 'lua/',
+	env_uesr	= 'nginx',
 }
 
 
@@ -29,6 +30,7 @@ _tofu.TOFU_PATH	= _TOFU_PATH
 _tofu.ROOT_PATH	= ngx.config.prefix()
 _tofu.APP_PATH	= _tofu.ROOT_PATH .. _options.app_path
 _tofu.ENV				= os.getenv('NGX_ENV') or _options.env
+_tofu.ENV_USER	= os.getenv('USER') or _options.env_user
 
 -- ----------------------------------------------------
 -- hack
@@ -38,6 +40,8 @@ local new_env = getfenv(0)
 local old_mt	= getmetatable(new_env)
 setmetatable(new_env, {})
 new_env.tofu = _tofu
+-- 修复第三方库使用全局变量_问题
+new_env._ = ''
 setmetatable(new_env, old_mt)
 
 
@@ -126,15 +130,66 @@ do -- load extend begin --
 	--		named		= 'string',
 	--		[type]	=	<type name> | default,
 	--		<type name> = {
-	--			handle	= string | function | table<.new>
+	--			handle	= string | function | table<._install>
 	--			options = { ... }
 	--		}
 	--	},
 	--	...
 	-- }
 	--
+	
+	--
+	-- 读取配置且合并
+	-- 因为extend是个数组，这里特处理配置,使其支持只覆盖其中某项配置
+	--
+	--
+	--
+	-- 合并配置的辅佐函数
+	-- 
+	local _tab_merge = require 'resty.tofu.util'.tab_merge
 
-	local extend  = _conf.extend or {}
+	local _ext_seq = {}
+	local _ext_map = {}
+	local function _merge_extend_conf(extend)
+		if not extend then
+			return
+		end
+		for i, v in ipairs(extend) do
+			if 'table' == type(v) then
+				local named = v.named or (#_ext_seq + 1) -- 如果没有命名,则使用顺序号
+				local e =_ext_map[named]
+				if not e then
+					e = {}
+					_ext_seq[#_ext_seq + 1] = named
+					_ext_map[named] = e
+				end
+				_tab_merge(e, v)
+
+			elseif 'string' == type(v) then
+				local named = v
+				if not _ext_map[named] then
+					_ext_seq[#_ext_seq + 1] = named
+					_ext_map[named] = v
+				end
+			end
+		end
+	end
+
+	-- 加载配置
+	local _cf = require 'resty.tofu.extend.config'
+	local _tmp1 = _cf.read(_tofu.ROOT_PATH .. 'conf/extend', {}) or {}
+	local _tmp2 = _cf.read(_tofu.ROOT_PATH .. 'conf/extend.' .. tofu.ENV) or {}
+
+	_merge_extend_conf(_tmp1.extend)
+	_merge_extend_conf(_tmp2.extend)
+
+	-- 按顺序copy配置
+	local extend = {}
+	for _, named in ipairs(_ext_seq) do
+		extend[#extend+1] = _ext_map[named]
+	end
+
+	-- local extend  = _conf.extend or {}
 	for _, ext in ipairs(extend) do
 		if 'string' == type (ext) then
 			_extend_install(nil, ext) 
@@ -145,7 +200,6 @@ do -- load extend begin --
 			end
 		end
 	end
-
 
 
 end -- load extend end --
