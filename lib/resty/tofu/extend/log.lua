@@ -254,6 +254,7 @@ function _M.console(opts)
 	opts = opts or {}
 	local function printer()
 		local fd = io.open('/dev/stdout', 'ab')
+		fd:setvbuf('no')
 		return function (lvl, msg) 
 			fd:write(msg)
 		end
